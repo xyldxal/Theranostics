@@ -16,6 +16,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def split_env_list(name, default=None):
+    value = os.getenv(name)
+    if not value:
+        return list(default or [])
+    return [item.strip() for item in value.split(",") if item.strip()]
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -26,17 +33,21 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '$rgwk-p!8^kw#51!zz-svqix09akmq
 DEBUG = os.environ.get('DJANGO_DEBUG', '') != 'False'
 
 # Allowed Hosts & CSRF
-ALLOWED_HOSTS = [
+DEFAULT_ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '.railway.app',
-    'theranostics-group3-hi191-production.up.railway.app'
+    'theranostics-group3-hi191-production.up.railway.app',
+    '.netlify.app',
 ]
+ALLOWED_HOSTS = split_env_list('DJANGO_ALLOWED_HOSTS', DEFAULT_ALLOWED_HOSTS)
 
-CSRF_TRUSTED_ORIGINS = [
+DEFAULT_CSRF_TRUSTED_ORIGINS = [
     'https://theranostics-group3-hi191-production.up.railway.app',
-    'https://*.railway.app'
+    'https://*.railway.app',
+    'https://*.netlify.app',
 ]
+CSRF_TRUSTED_ORIGINS = split_env_list('DJANGO_CSRF_TRUSTED_ORIGINS', DEFAULT_CSRF_TRUSTED_ORIGINS)
 
 # Application definition
 INSTALLED_APPS = [
@@ -96,12 +107,22 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Theranostics.wsgi.application'
 
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.getenv('DATABASE_URL'),
-        conn_max_age=600
-    )
-}
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600
+        )
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -126,29 +147,29 @@ USE_I18N = True
 USE_TZ = True
 
 RAILWAY_VOLUME_NAME = os.getenv('RAILWAY_VOLUME_NAME')
-RAILWAY_VOLUME_MOUNT_PATH = os.getenv('RAILWAY_VOLUME_MOUNT_PATH', '/app/media')
+RAILWAY_VOLUME_MOUNT_PATH = os.getenv('RAILWAY_VOLUME_MOUNT_PATH')
+PRODUCTION_MEDIA_ROOT = (
+    os.getenv('DJANGO_MEDIA_ROOT')
+    or RAILWAY_VOLUME_MOUNT_PATH
+    or os.path.join(BASE_DIR, 'media')
+)
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-print(f"Your STATIC_ROOT: {STATIC_ROOT}")
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
 # Media files
-MEDIA_URL = '/media/'
-MEDIA_ROOT = RAILWAY_VOLUME_MOUNT_PATH if not DEBUG else os.path.join(BASE_DIR, 'media')
+MEDIA_URL = os.getenv('DJANGO_MEDIA_URL', '/media/')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media') if DEBUG else PRODUCTION_MEDIA_ROOT
 
 if not DEBUG:
-    print(f"Railway Volume Name: {RAILWAY_VOLUME_NAME}")
-    print(f"Railway Volume Mount Path: {RAILWAY_VOLUME_MOUNT_PATH}")
-    print(f"Media Root: {MEDIA_ROOT}")
-    
     # Storage configuration for production
     STORAGES = {
         "default": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
             "OPTIONS": {
-                "location": RAILWAY_VOLUME_MOUNT_PATH,
+                "location": MEDIA_ROOT,
                 "base_url": MEDIA_URL,
             },
         },
