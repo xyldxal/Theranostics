@@ -23,14 +23,26 @@ def split_env_list(name, default=None):
         return list(default or [])
     return [item.strip() for item in value.split(",") if item.strip()]
 
+
+def env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '$rgwk-p!8^kw#51!zz-svqix09akmq^1nrd875l!*ei3&--m$y')
+SECRET_KEY = (
+    os.environ.get('DJANGO_SECRET_KEY')
+    or os.environ.get('SECRET_KEY')
+    or '$rgwk-p!8^kw#51!zz-svqix09akmq^1nrd875l!*ei3&--m$y'
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_DEBUG', '') != 'False'
+RENDER_EXTERNAL_HOSTNAME = os.getenv('RENDER_EXTERNAL_HOSTNAME')
+DEBUG = env_bool('DJANGO_DEBUG', default=not bool(os.getenv('RENDER')))
 
 # Allowed Hosts & CSRF
 DEFAULT_ALLOWED_HOSTS = [
@@ -39,15 +51,23 @@ DEFAULT_ALLOWED_HOSTS = [
     '.railway.app',
     'theranostics-group3-hi191-production.up.railway.app',
     '.netlify.app',
+    '.onrender.com',
 ]
 ALLOWED_HOSTS = split_env_list('DJANGO_ALLOWED_HOSTS', DEFAULT_ALLOWED_HOSTS)
+if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 DEFAULT_CSRF_TRUSTED_ORIGINS = [
     'https://theranostics-group3-hi191-production.up.railway.app',
     'https://*.railway.app',
     'https://*.netlify.app',
+    'https://*.onrender.com',
 ]
 CSRF_TRUSTED_ORIGINS = split_env_list('DJANGO_CSRF_TRUSTED_ORIGINS', DEFAULT_CSRF_TRUSTED_ORIGINS)
+if RENDER_EXTERNAL_HOSTNAME:
+    render_origin = f'https://{RENDER_EXTERNAL_HOSTNAME}'
+    if render_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(render_origin)
 
 # Application definition
 INSTALLED_APPS = [
